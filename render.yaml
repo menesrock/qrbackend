@@ -3,7 +3,7 @@ services:
     name: qr-restaurant-backend
     env: node
     plan: free
-    buildCommand: npm install && npm run build && npx prisma generate
+    buildCommand: npm install && npm run build && npx prisma migrate deploy
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
