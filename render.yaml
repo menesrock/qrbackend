@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: qr-restaurant-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build && npx prisma generate
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      - key: APP_DOMAIN
+        sync: false
+
+databases:
+  - name: qr-restaurant-db
+    plan: free
+    databaseName: qr_restaurant
+    user: qr_restaurant_user
+
