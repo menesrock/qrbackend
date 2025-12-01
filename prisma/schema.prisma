@@ -1,0 +1,246 @@
+// Prisma schema for QR Restaurant System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String
+  role        String   // 'admin', 'waiter', 'chef', or custom role name
+  isOnline    Boolean  @default(false)
+  permissions String[] // Array of permission strings for custom roles
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  pushSubscriptions PushSubscription[]
+  completedCalls    CallRequest[]      @relation("CompletedBy")
+
+  @@index([role])
+  @@index([isOnline])
+  @@map("users")
+}
+
+model MenuItem {
+  id                       String    @id @default(uuid())
+  name                     String
+  nameTranslations         Json      @default("{}")
+  description              String
+  descriptionTranslations  Json      @default("{}")
+  price                    Decimal   @db.Decimal(10, 2)
+  category                 String
+  imageUrl                 String?
+  isPopular                Boolean   @default(false)
+  popularRank              Int?
+  displayOrder             Int?
+  isActive                 Boolean   @default(true)
+  nutritionalInfo          Json?
+  allergens                String[]
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  // Relations
+  customizations Customization[]
+  orderItems     OrderItem[]
+  feedbacks      Feedback[]      @relation("MentionedProducts")
+
+  @@index([category, isActive])
+  @@index([isPopular, popularRank])
+  @@map("menu_items")
+}
+
+model Customization {
+  id            String  @id @default(uuid())
+  menuItemId    String
+  type          String  // 'option', 'extra', 'removal'
+  name          String
+  options       Json    // Array of {name, price, isDefault}
+  allowMultiple Boolean @default(false)
+  required      Boolean @default(false)
+
+  // Relations
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@index([menuItemId])
+  @@map("customizations")
+}
+
+model Table {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  qrCodeUrl       String
+  status          String    @default("available") // 'available', 'occupied'
+  occupiedSince   DateTime?
+  currentOccupants Json?    // Array of {name, joinedAt}
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  orders       Order[]
+  callRequests CallRequest[]
+
+  @@index([status])
+  @@map("tables")
+}
+
+model Order {
+  id            String    @id @default(uuid())
+  tableId       String
+  tableName     String
+  customerName  String
+  customerEmail String?   // Link to Customer email
+  customerId    String?   // Link to Customer ID
+  status        String    @default("pending") // 'pending', 'confirmed', 'preparing', 'ready', 'completed'
+  queuePosition Int?
+  totalAmount   Decimal   @db.Decimal(10, 2)
+  orderSource   String    @default("customer") // 'customer', 'manual'
+  claimedBy     String?   // User ID who claimed this order
+  claimedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  confirmedAt   DateTime?
+  readyAt       DateTime?
+  completedAt   DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  table      Table       @relation(fields: [tableId], references: [id])
+  customer   Customer?   @relation("CustomerOrders", fields: [customerId], references: [id])
+  items      OrderItem[]
+  feedbacks  Feedback[]
+
+  @@index([tableId, createdAt])
+  @@index([status, createdAt])
+  @@index([status, confirmedAt])
+  @@index([claimedBy])
+  @@index([customerId])
+  @@index([customerEmail])
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String  @id @default(uuid())
+  orderId         String
+  menuItemId      String
+  menuItemName    String
+  quantity        Int
+  basePrice       Decimal @db.Decimal(10, 2)
+  customizations  Json    // Array of {customizationId, selectedOptions}
+  customerNotes   String?
+  itemTotal       Decimal @db.Decimal(10, 2)
+
+  // Relations
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model CallRequest {
+  id           String    @id @default(uuid())
+  tableId      String
+  tableName    String
+  customerName String
+  type         String    // 'bill', 'napkin', 'cleaning'
+  status       String    @default("pending") // 'pending', 'completed'
+  claimedBy    String?   // User ID who claimed this request
+  claimedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+  completedBy  String?
+
+  // Relations
+  table       Table  @relation(fields: [tableId], references: [id])
+  completedByUser User? @relation("CompletedBy", fields: [completedBy], references: [id])
+
+  @@index([status, createdAt])
+  @@index([tableId, createdAt])
+  @@index([claimedBy])
+  @@map("call_requests")
+}
+
+model Feedback {
+  id                String   @id @default(uuid())
+  tableId           String
+  orderId           String
+  serviceRating     Int
+  hygieneRating     Int
+  productRating     Int
+  overallRating     Int
+  comment           String?
+  mentionedProducts String[]
+  createdAt         DateTime @default(now())
+
+  // Relations
+  order            Order      @relation(fields: [orderId], references: [id])
+  mentionedItems   MenuItem[] @relation("MentionedProducts")
+
+  @@index([createdAt])
+  @@map("feedback")
+}
+
+model Settings {
+  id             String   @id @default("branding")
+  logo           String?
+  primaryColor   String   @default("#6200EE")
+  secondaryColor String   @default("#03DAC6")
+  accentColor    String   @default("#FF6B6B")
+  restaurantName String   @default("Restaurant")
+  customerMenuBaseUrl String?
+  menuCategories Json?
+  crossSellRules Json?    // { "category": ["targetCategory1", "targetCategory2"] }
+  updatedAt      DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model Role {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  permissions  String[]
+  isSystemRole Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model PushSubscription {
+  id           String   @id @default(uuid())
+  userId       String
+  endpoint     String   @unique
+  keys         Json     // {p256dh, auth}
+  createdAt    DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model Customer {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  emailConsent    Boolean  @default(false) // GDPR consent for email marketing
+  visitCount      Int      @default(0)
+  totalSpent      Decimal  @db.Decimal(10, 2) @default(0)
+  lastVisitAt     DateTime?
+  firstVisitAt    DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  orders          Order[]  @relation("CustomerOrders")
+
+  @@index([email])
+  @@index([lastVisitAt])
+  @@map("customers")
+}
