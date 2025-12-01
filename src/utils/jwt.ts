@@ -9,14 +9,14 @@ export interface TokenPayload {
 
 export const generateAccessToken = (payload: TokenPayload): string => {
   const options: SignOptions = {
-    expiresIn: config.jwt.expiresIn,
+    expiresIn: config.jwt.expiresIn as string | number,
   };
   return jwt.sign(payload, config.jwt.secret, options);
 };
 
 export const generateRefreshToken = (payload: TokenPayload): string => {
   const options: SignOptions = {
-    expiresIn: config.jwt.refreshExpiresIn,
+    expiresIn: config.jwt.refreshExpiresIn as string | number,
   };
   return jwt.sign(payload, config.jwt.refreshSecret, options);
 };
