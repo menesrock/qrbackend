@@ -1,6 +1,6 @@
 // Data transformation utilities between database and API models
 
-import { User, MenuItem, Order, Table, Settings, Customization } from '../types/models';
+import { User, MenuItem, Order, Table, Settings, Customization, TableOccupant } from '../types/models';
 
 /**
  * Remove password from user object
@@ -13,28 +13,34 @@ export const sanitizeUser = (user: User): Omit<User, 'password'> => {
 /**
  * Convert database dates to ISO strings for API response
  */
-export const serializeMenuItem = (item: MenuItem & { customizations?: Customization[] }) => ({
-    ...item,
-    price: Number(item.price),
-    createdAt: item.createdAt.toISOString(),
-    updatedAt: item.updatedAt.toISOString(),
-  customizations: item.customizations?.map((customization) => ({
-    ...customization,
-    options: customization.options,
-  })),
-});
-
-export const serializeOrder = (order: Order & { items?: any[] }) => {
+export const serializeMenuItem = (item: any) => {
+  const menuItem = item as MenuItem & { customizations?: Customization[] };
   return {
-    ...order,
-    totalAmount: Number(order.totalAmount),
-    claimedAt: order.claimedAt?.toISOString() || null,
-    createdAt: order.createdAt.toISOString(),
-    confirmedAt: order.confirmedAt?.toISOString() || null,
-    readyAt: order.readyAt?.toISOString() || null,
-    completedAt: order.completedAt?.toISOString() || null,
-    updatedAt: order.updatedAt.toISOString(),
-    items: order.items?.map((item) => ({
+    ...menuItem,
+    nameTranslations: (menuItem.nameTranslations as any) || {},
+    descriptionTranslations: (menuItem.descriptionTranslations as any) || {},
+    price: Number(menuItem.price),
+    createdAt: menuItem.createdAt instanceof Date ? menuItem.createdAt.toISOString() : menuItem.createdAt,
+    updatedAt: menuItem.updatedAt instanceof Date ? menuItem.updatedAt.toISOString() : menuItem.updatedAt,
+    customizations: menuItem.customizations?.map((customization) => ({
+      ...customization,
+      options: customization.options,
+    })),
+  };
+};
+
+export const serializeOrder = (order: any) => {
+  const orderData = order as Order & { items?: any[] };
+  return {
+    ...orderData,
+    totalAmount: Number(orderData.totalAmount),
+    claimedAt: orderData.claimedAt instanceof Date ? orderData.claimedAt.toISOString() : (orderData.claimedAt || null),
+    createdAt: orderData.createdAt instanceof Date ? orderData.createdAt.toISOString() : orderData.createdAt,
+    confirmedAt: orderData.confirmedAt instanceof Date ? orderData.confirmedAt.toISOString() : (orderData.confirmedAt || null),
+    readyAt: orderData.readyAt instanceof Date ? orderData.readyAt.toISOString() : (orderData.readyAt || null),
+    completedAt: orderData.completedAt instanceof Date ? orderData.completedAt.toISOString() : (orderData.completedAt || null),
+    updatedAt: orderData.updatedAt instanceof Date ? orderData.updatedAt.toISOString() : orderData.updatedAt,
+    items: orderData.items?.map((item) => ({
       ...item,
       basePrice: Number(item.basePrice),
       itemTotal: Number(item.itemTotal),
@@ -42,23 +48,56 @@ export const serializeOrder = (order: Order & { items?: any[] }) => {
   };
 };
 
-export const serializeTable = (table: Table) => {
+export const serializeTable = (table: any) => {
+  const tableData = table as Table;
+  const occupants = tableData.currentOccupants;
+  let parsedOccupants: TableOccupant[] | null = null;
+  
+  if (occupants) {
+    if (Array.isArray(occupants)) {
+      parsedOccupants = occupants as TableOccupant[];
+    } else if (typeof occupants === 'string') {
+      try {
+        parsedOccupants = JSON.parse(occupants) as TableOccupant[];
+      } catch {
+        parsedOccupants = null;
+      }
+    } else {
+      parsedOccupants = occupants as TableOccupant[];
+    }
+  }
+  
   return {
-    ...table,
-    occupiedSince: table.occupiedSince?.toISOString() || null,
-    createdAt: table.createdAt.toISOString(),
-    updatedAt: table.updatedAt.toISOString(),
-    currentOccupants: Array.isArray(table.currentOccupants) 
-      ? table.currentOccupants 
-      : (table.currentOccupants ? [table.currentOccupants] : []),
+    ...tableData,
+    occupiedSince: tableData.occupiedSince instanceof Date ? tableData.occupiedSince.toISOString() : (tableData.occupiedSince || null),
+    createdAt: tableData.createdAt instanceof Date ? tableData.createdAt.toISOString() : tableData.createdAt,
+    updatedAt: tableData.updatedAt instanceof Date ? tableData.updatedAt.toISOString() : tableData.updatedAt,
+    currentOccupants: parsedOccupants || [],
   };
 };
 
-export const serializeSettings = (settings: Settings) => ({
-    ...settings,
-  menuCategories: settings.menuCategories ?? [],
-    updatedAt: settings.updatedAt.toISOString(),
-});
+export const serializeSettings = (settings: any) => {
+  const settingsData = settings as Settings;
+  let menuCategories: string[] | null = null;
+  
+  if (settingsData.menuCategories) {
+    if (Array.isArray(settingsData.menuCategories)) {
+      menuCategories = settingsData.menuCategories as string[];
+    } else if (typeof settingsData.menuCategories === 'string') {
+      try {
+        menuCategories = JSON.parse(settingsData.menuCategories) as string[];
+      } catch {
+        menuCategories = null;
+      }
+    }
+  }
+  
+  return {
+    ...settingsData,
+    menuCategories: menuCategories ?? [],
+    updatedAt: settingsData.updatedAt instanceof Date ? settingsData.updatedAt.toISOString() : settingsData.updatedAt,
+  };
+};
 
 /**
  * Calculate order item total
